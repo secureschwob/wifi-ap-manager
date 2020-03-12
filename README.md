@@ -1,6 +1,6 @@
 # wifi-ap-manager
 Managing WiFi Access Points on Raspberry Pi using a Python Script. Make sure to configure the SSID and passphrase at the top of the script before using it.
-See https://www.mstriegel.de/Blog/2020-03_March.html#wifi-ap-with-python for more background information.
+See [my blog](https://www.mstriegel.de/Blog/2020-03_March.html#wifi-ap-with-python) for background information.
 
 Tested and works on Ubuntu 18.04 and Raspbian on RasPi 3B+
 ## Usage
