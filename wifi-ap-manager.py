@@ -22,12 +22,11 @@
 # @file		wifi-ap-manager.py
 # @author	Martin Striegel
 #			mail@mstriegel.de
-# Script for installing and configuring Ubuntu/Debian as WiFi access point with
-# a DHCP server.
+# Script for installing and configuring Ubuntu/Debian DHCP server and wireless access points.
 #
 # Essentially performs the steps from
-# https://www.raspberrypi.org/documentation/configuration/wireless/access-point-routed.md
-# in a clean and automated way
+# https://www.raspberrypi.org/documentation/configuration/wireless/access-point-routed.md (Dated 2020-06-08)
+# in a clean, easily reversible and automated way
 ######
 
 # Standard library imports
@@ -37,20 +36,19 @@ import os
 import shutil
 import subprocess
 import sys
-import time
+# import time
 
 
 
 ###
-# Global variables
+# Global variables - do not modify here, use config.ini instead.
 ###
-#do not modify
 CONFIG_PARSER = None
 PLATFORM:str = None
 
-ETHERNET_INTERFACE = ""  
-WIFI_INTERFACE = ""               
-WIFI_DRIVER = ""      
+ETHERNET_INTERFACE = ""
+WIFI_INTERFACE = ""
+WIFI_DRIVER = ""
 ACCESSPOINT_SSID = ""
 ACCESSPOINT_PW = ""
 IP_ADDRESS = ""
@@ -66,9 +64,7 @@ SYSTEM_CONFIG_FILES = {
     }
 
 DEPENDENCIES=("hostapd", "dnsmasq", "dhcpcd5")
-SERVICE_LIST=["hostapd", "dnsmasq", "dhcpcd", "NetworkManager"]
-
-AP_IS_RUNNING = False
+SERVICE_LIST=["hostapd", "dnsmasq", "dhcpcd"]
 
 
 
@@ -238,7 +234,7 @@ def prepare_dhcpcd(network_interface):
     """
     print("Preparing dhcpcd")
 
-    stop_network_manager()
+    # stop_network_manager()
     stop_dnsmasq()
     stop_hostapd()
        
@@ -266,9 +262,8 @@ def deactivate_all_and_restore_system_config():
     stop_dhcpcd()
     stop_dnsmasq()
     stop_hostapd()
-    start_network_manager()
+    #start_network_manager()
     restore_config_backup_files()
-    #check_all_daemon_statuses()
 
 
 
@@ -309,22 +304,14 @@ def stop_hostapd():
 
 
 
-def start_network_manager():
-    network_manager_start_command = ["sudo", "service", "NetworkManager", "start"]
-    subprocess.run(network_manager_start_command)
-
-
-def stop_network_manager():
-    network_manager_stop_args = ["sudo", "service", "NetworkManager", "stop"]
-    subprocess.run(network_manager_stop_args)
-
-
-
 def configure_dhcpcd(network_interface: str):
     """ Set a static IP address to the network interface provided as argument """
+    iface = network_interface.replace('"', '')
+    ip = IP_ADDRESS.replace('"', '')
+
     static_ip_append_string=f"\
-interface {network_interface}\n\
-    static ip_address={IP_ADDRESS}/24\
+interface {iface}\n\
+    static ip_address={ip}/24\n\
     nohook wpa_supplicant"
 
     with open(SYSTEM_CONFIG_FILES["dhcp_config_file_path"], 'a') as file:
@@ -341,11 +328,12 @@ def configure_dnsmasq(network_interface: str):
     
     NOTE: dhcp-authoritative following https://raspberrypi.stackexchange.com/questions/33946/dnsmasq-dhcp-not-giving-ip-address
     """
+    iface = network_interface.replace('"', '')
     ip_range_lower = DCHP_IP_RANGE_LOWER.replace('"', '')
     ip_range_upper = DHCP_IP_RANGE_UPPER.replace('"', '')
 
     configure_dnsmasq_append_string=f"\
-interface={network_interface}\n\
+interface={iface}\n\
 dhcp-authoritative\n\
 dhcp-range={ip_range_lower},{ip_range_upper},255.255.255.0,24h"
 
@@ -359,9 +347,10 @@ def configure_hostapd():
     As we can use hostapd on the WiFi interface only, no need to provide it as argument.  
     NOTE: https://raspberrypi.stackexchange.com/questions/82614/ap-setup-from-documentation-not-working
     """
+    iface = network_interface.replace('"', '')
 
     configure_hostapd_append_string=f"\
-interface={network_interface}\n\
+interface={iface}\n\
 driver={WIFI_DRIVER}\n\
 ssid={ACCESSPOINT_SSID}\n\
 hw_mode=g\n\
@@ -408,27 +397,37 @@ if __name__ == "__main__":
 
 
     if args.prepare:
+        if os.path.exists(".ap_is_prepared_marker"):
+            sys.exit("dhcpcd is already prepared, now call script with -a to launch access point")
+            
         backup_system_config_files()
-        prepare_dhcpcd(WIFI_INTERFACE)
         _ = open(".ap_is_prepared_marker", 'a')
+        prepare_dhcpcd(WIFI_INTERFACE)
         print("dhcpcd is prepared, now call script with -a to launch access point")
+    
     elif args.activate:
         if not os.path.exists(".ap_is_prepared_marker"):
             sys.exit("Please call this script with -p first to prepare the access point.")
-        start_hostapd_and_dnsmasq(WIFI_INTERFACE)
+        else:
+            if not os.path.exists(".ap_is_running_marker"):
+                _ = open(".ap_is_running_marker", 'a')
+                start_hostapd_and_dnsmasq(WIFI_INTERFACE)
     
     elif args.activate_all:
-        backup_system_config_files()
-        prepare_dhcpcd(WIFI_INTERFACE)
-        _ = open(".ap_is_prepared_marker", 'a')
-        if not os.path.exists(".ap_is_prepared_marker"):
-            sys.exit("Please call this script with -p first to prepare the access point.")
-        start_hostapd_and_dnsmasq(WIFI_INTERFACE)
+        if os.path.exists(".ap_is_prepared_marker") and os.path.exists(".ap_is_running_marker"):
+            sys.exit("Wireless AP is already running.")
+        else:
+            _ = open(".ap_is_prepared_marker", 'a')
+            _ = open(".ap_is_running_marker", 'a')
+            backup_system_config_files()
+            prepare_dhcpcd(WIFI_INTERFACE)
+            start_hostapd_and_dnsmasq(WIFI_INTERFACE)
     
     elif args.deactivate_all:
         deactivate_all_and_restore_system_config()
         try:
             os.remove(".ap_is_prepared_marker")
+            os.remove(".ap_is_running_marker")
         except FileNotFoundError:
             print("Tried to deactivate, but apparently nothing was running.")
     
@@ -437,6 +436,7 @@ if __name__ == "__main__":
             if check_if_installed(dependency) == False:
                 print(f"Dependency {dependency} missing.")
         print("Dependency check done. If nothing was printed, all dependencies are installed.")
+    
     elif args.install_dependencies:
         check_and_install_all_dependencies()
         print("Dependency install done. If nothing was printed, all dependencies were installed already.")
@@ -445,10 +445,14 @@ if __name__ == "__main__":
         check_all_daemon_statuses()
     
     elif args.dhcp_at_ethernet_interface:
-        backup_system_config_files()
-        _ = open(".ap_is_prepared_marker", 'a')
-        prepare_dhcpcd(ETHERNET_INTERFACE)
-        configure_dnsmasq(ETHERNET_INTERFACE)
-        restart_dnsmasq()
+        if os.path.exists(".ap_is_prepared_marker") and os.path.exists(".ap_is_running_marker"):
+            sys.exit("DHCP is already running at Ethernet interface.")
+        else:
+            _ = open(".ap_is_prepared_marker", 'a')
+            _ = open(".ap_is_running_marker", 'a')
+            backup_system_config_files()
+            prepare_dhcpcd(ETHERNET_INTERFACE)
+            configure_dnsmasq(ETHERNET_INTERFACE)
+            restart_dnsmasq()
     else:
         sys.exit("Please specify one argument. Call this script with --help to see supported arguments.")
