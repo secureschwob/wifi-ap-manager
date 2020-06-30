@@ -350,12 +350,13 @@ def configure_hostapd(network_interface: str):
     """
     As we can use hostapd on the WiFi interface only, no need to provide it as argument.  
     NOTE: https://raspberrypi.stackexchange.com/questions/82614/ap-setup-from-documentation-not-working
+    NOTE: seems that driver={WIFI_DRIVER}\n\ argument is not needed
+    
     """
     iface = network_interface.replace('"', '')
 
     configure_hostapd_append_string=f"\
 interface={iface}\n\
-driver={WIFI_DRIVER}\n\
 ssid={ACCESSPOINT_SSID}\n\
 hw_mode=g\n\
 channel=7\n\
