@@ -61,6 +61,7 @@ SYSTEM_CONFIG_FILES = {
     "hostapd_config_file_path":     "/etc/hostapd/hostapd.conf",
     "hostapd_link_to_config_file":  "/etc/default/hostapd",
     "hostapd_init_d_file":          "/etc/init.d/hostapd",
+    "routed_ap_config_file":        "/etc/sysctl.d/routed-ap.conf"
     }
 
 DEPENDENCIES=("hostapd", "dnsmasq", "dhcpcd5")
@@ -84,6 +85,7 @@ def parse_commandline_arguments():
     parser.add_argument('-a', "--activate", help="Activate hostapd and dnsmasq. Only works if dhcpcd has been set up with -p before.", action='store_true')
     parser.add_argument('-aa', "--activate_all", help="Activate dhcpcd, hostapd and dnsmasq in a single run.")
     parser.add_argument('-d', "--deactivate_all", action='store_true', help='Deactivate dhcpcd, dnsmasq, hostapd and restore their default configurations.')
+    parser.add_argument('-r', "--routing", action='store_true', help="Enable routing between interfaces")
 
     parser.add_argument('-checkdep', "--check_dependencies", action='store_true', help="Check if dependencies are installed.")
     parser.add_argument('-i', "--install_dependencies", action='store_true', help="Install missing dependencies.")
@@ -196,12 +198,9 @@ def check_daemon_status(service):
 
 
 def backup_system_config_files():
-    # Make a backup copy of files we are going to modify for setting up WiFi AP
-	# and DHCP server
-    #
-	# NOTE if your original config file is screwed up already, your backup will
-	# 	be screwed up, too
-    
+    """ Make a backup copy of files we are going to modify for setting up WiFi AP and DHCP server
+	NOTE if your original config file is screwed up already, your backup will be screwed up, too
+    """
     for _key, configfile in SYSTEM_CONFIG_FILES.items():
         configfile_original = configfile + "_original"
 
@@ -226,6 +225,11 @@ def restore_config_backup_files():
             shutil.copyfile(configfile_original, configfile)
             os.remove(configfile_original)
             print(f"Restored backup {configfile}")
+
+    # as this file is only needed for our program, we simply delete it and do not have to restore a backup
+    if os.path.exists(SYSTEM_CONFIG_FILES["routed_ap_config_file"]):
+        os.remove(SYSTEM_CONFIG_FILES["routed_ap_config_file"])
+        print("Deleted {}".format(SYSTEM_CONFIG_FILES["routed_ap_config_file"]))
 
 
 
@@ -385,6 +389,23 @@ rsn_pairwise=CCMP"
 
 
 
+def configure_routing(output_interface: str):
+    """
+    Keyword Arguments:
+        output_interface -- if set to e.g., the WiFi interface, packets received via Ethernet will be forwarded to WiFi
+    """
+    configure_routing_string = "net.ipv4.ip_forward=1"
+
+    with open(SYSTEM_CONFIG_FILES["routed_ap_config_file"], 'a') as file:
+        file.write(configure_routing_string)
+
+    outif = output_interface.replace('"', '')
+    args = ["sudo", "iptables", "-t", "nat", "-A", "POSTROUTING", "-o", outif, "-j", "MASQUERADE"]
+    command_subprocess = subprocess.Popen(args, stdout=subprocess.PIPE)
+
+    print(f"Routing incoming traffic to interface {outif}")
+
+
 
 
 if __name__ == "__main__":
@@ -412,6 +433,9 @@ if __name__ == "__main__":
             if not os.path.exists(".ap_is_running_marker"):
                 _ = open(".ap_is_running_marker", 'a')
                 start_hostapd_and_dnsmasq(WIFI_INTERFACE)
+
+                if args.routing:
+                    configure_routing(output_interface=ETHERNET_INTERFACE)
     
     elif args.activate_all:
         if os.path.exists(".ap_is_prepared_marker") and os.path.exists(".ap_is_running_marker"):
@@ -422,6 +446,9 @@ if __name__ == "__main__":
             backup_system_config_files()
             prepare_dhcpcd(WIFI_INTERFACE)
             start_hostapd_and_dnsmasq(WIFI_INTERFACE)
+
+            if args.routing:
+                configure_routing(output_interface=ETHERNET_INTERFACE)
     
     elif args.deactivate_all:
         deactivate_all_and_restore_system_config()
@@ -454,5 +481,8 @@ if __name__ == "__main__":
             prepare_dhcpcd(ETHERNET_INTERFACE)
             configure_dnsmasq(ETHERNET_INTERFACE)
             restart_dnsmasq()
+
+            if args.routing:
+                configure_routing(output_interface=WIFI_INTERFACE)
     else:
         sys.exit("Please specify one argument. Call this script with --help to see supported arguments.")
