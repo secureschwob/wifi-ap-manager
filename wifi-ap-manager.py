@@ -354,12 +354,12 @@ def configure_hostapd(network_interface: str):
     
     """
     iface = network_interface.replace('"', '')
-    ACCESSPOINT_SSID = ACCESSPOINT_SSID.replace('"', '')
-    ACCESSPOINT_PW = ACCESSPOINT_PW.replace('"', '')
+    ap_ssid = ACCESSPOINT_SSID.replace('"', '')
+    ap_pw = ACCESSPOINT_PW.replace('"', '')
 
     configure_hostapd_append_string=f"\
 interface={iface}\n\
-ssid={ACCESSPOINT_SSID}\n\
+ssid={ap_ssid}\n\
 hw_mode=g\n\
 channel=7\n\
 wmm_enabled=0\n\
@@ -367,7 +367,7 @@ macaddr_acl=0\n\
 auth_algs=1\n\
 ignore_broadcast_ssid=0\n\
 wpa=2\n\
-wpa_passphrase={ACCESSPOINT_PW}\n\
+wpa_passphrase={ap_pw}\n\
 wpa_key_mgmt=WPA-PSK\n\
 wpa_pairwise=TKIP\n\
 rsn_pairwise=CCMP"
