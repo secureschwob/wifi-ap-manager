@@ -346,7 +346,7 @@ dhcp-range={ip_range_lower},{ip_range_upper},255.255.255.0,24h"
 
 
 
-def configure_hostapd():
+def configure_hostapd(network_interface: str):
     """
     As we can use hostapd on the WiFi interface only, no need to provide it as argument.  
     NOTE: https://raspberrypi.stackexchange.com/questions/82614/ap-setup-from-documentation-not-working
