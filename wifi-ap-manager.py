@@ -354,6 +354,8 @@ def configure_hostapd(network_interface: str):
     
     """
     iface = network_interface.replace('"', '')
+    ACCESSPOINT_SSID = ACCESSPOINT_SSID.replace('"', '')
+    ACCESSPOINT_PW = ACCESSPOINT_PW.replace('"', '')
 
     configure_hostapd_append_string=f"\
 interface={iface}\n\
