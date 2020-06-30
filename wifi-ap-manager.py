@@ -253,7 +253,7 @@ def prepare_dhcpcd(network_interface):
 def start_hostapd_and_dnsmasq(network_interface):
     # need to have that in one function as the sequence
     # of activation matters
-    configure_hostapd()
+    configure_hostapd(network_interface)
     start_hostapd()
 
     configure_dnsmasq(network_interface)
