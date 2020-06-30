@@ -83,9 +83,9 @@ def parse_commandline_arguments():
 
     parser.add_argument('-p', "--prepare", help="Prepare dhcpcd, as it takes longest. Then call this script with -a to activate hostapd and dnsmasq.", action='store_true')
     parser.add_argument('-a', "--activate", help="Activate hostapd and dnsmasq. Only works if dhcpcd has been set up with -p before.", action='store_true')
-    parser.add_argument('-aa', "--activate_all", help="Activate dhcpcd, hostapd and dnsmasq in a single run.")
+    parser.add_argument('-aa', "--activate_all", action='store_true', help="Activate dhcpcd, hostapd and dnsmasq in a single run.")
     parser.add_argument('-d', "--deactivate_all", action='store_true', help='Deactivate dhcpcd, dnsmasq, hostapd and restore their default configurations.')
-    parser.add_argument('-r', "--routing", action='store_true', help="Enable routing between interfaces")
+    # parser.add_argument('-r', "--routing", action='store_true', help="Enable routing between interfaces")
 
     parser.add_argument('-checkdep', "--check_dependencies", action='store_true', help="Check if dependencies are installed.")
     parser.add_argument('-i', "--install_dependencies", action='store_true', help="Install missing dependencies.")
@@ -389,21 +389,21 @@ rsn_pairwise=CCMP"
 
 
 
-def configure_routing(output_interface: str):
-    """
-    Keyword Arguments:
-        output_interface -- if set to e.g., the WiFi interface, packets received via Ethernet will be forwarded to WiFi
-    """
-    configure_routing_string = "net.ipv4.ip_forward=1"
+# def configure_routing(output_interface: str):
+#     """
+#     Keyword Arguments:
+#         output_interface -- if set to e.g., the WiFi interface, packets received via Ethernet will be forwarded to WiFi
+#     """
+#     configure_routing_string = "net.ipv4.ip_forward=1"
 
-    with open(SYSTEM_CONFIG_FILES["routed_ap_config_file"], 'a') as file:
-        file.write(configure_routing_string)
+#     with open(SYSTEM_CONFIG_FILES["routed_ap_config_file"], 'a') as file:
+#         file.write(configure_routing_string)
 
-    outif = output_interface.replace('"', '')
-    args = ["sudo", "iptables", "-t", "nat", "-A", "POSTROUTING", "-o", outif, "-j", "MASQUERADE"]
-    command_subprocess = subprocess.Popen(args, stdout=subprocess.PIPE)
+#     outif = output_interface.replace('"', '')
+#     args = ["sudo", "iptables", "-t", "nat", "-A", "POSTROUTING", "-o", outif, "-j", "MASQUERADE"]
+#     command_subprocess = subprocess.Popen(args, stdout=subprocess.PIPE)
 
-    print(f"Routing incoming traffic to interface {outif}")
+#     print(f"Routing incoming traffic to interface {outif}")
 
 
 
@@ -434,8 +434,8 @@ if __name__ == "__main__":
                 _ = open(".ap_is_running_marker", 'a')
                 start_hostapd_and_dnsmasq(WIFI_INTERFACE)
 
-                if args.routing:
-                    configure_routing(output_interface=ETHERNET_INTERFACE)
+                # if args.routing:
+                #     configure_routing(output_interface=ETHERNET_INTERFACE)
     
     elif args.activate_all:
         if os.path.exists(".ap_is_prepared_marker") and os.path.exists(".ap_is_running_marker"):
@@ -447,8 +447,8 @@ if __name__ == "__main__":
             prepare_dhcpcd(WIFI_INTERFACE)
             start_hostapd_and_dnsmasq(WIFI_INTERFACE)
 
-            if args.routing:
-                configure_routing(output_interface=ETHERNET_INTERFACE)
+            # if args.routing:
+            #     configure_routing(output_interface=ETHERNET_INTERFACE)
     
     elif args.deactivate_all:
         deactivate_all_and_restore_system_config()
@@ -482,7 +482,7 @@ if __name__ == "__main__":
             configure_dnsmasq(ETHERNET_INTERFACE)
             restart_dnsmasq()
 
-            if args.routing:
-                configure_routing(output_interface=WIFI_INTERFACE)
+            # if args.routing:
+            #     configure_routing(output_interface=WIFI_INTERFACE)
     else:
         sys.exit("Please specify one argument. Call this script with --help to see supported arguments.")
